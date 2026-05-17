@@ -229,7 +229,7 @@ struct ChartLabAppleView: View {
                     legendCard
                     syntheticNote(b)
                 } else if let msg = errorMessage {
-                    Text(msg).font(.caption).foregroundStyle(.red)
+                    Text(msg).font(.caption).foregroundStyle(Color.riskRed)
                         .padding(.vertical, 40)
                 }
             }
@@ -498,7 +498,7 @@ struct ChartLabCustomView: View {
                     }
                     syntheticNote(b)
                 } else if let msg = errorMessage {
-                    Text(msg).font(.caption).foregroundStyle(.red)
+                    Text(msg).font(.caption).foregroundStyle(Color.riskRed)
                 }
             }
             .padding(16)

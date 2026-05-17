@@ -2,12 +2,10 @@
 //  AppRoot.swift
 //  before
 //
-//  앱 진입 흐름 컨트롤러:
-//    Splash (0.5s)  →  (첫 진입이면) Onboarding → Auth (옵션) → Main
-//                   →  (재진입이면) Main
+//  앱 진입 흐름:
+//    Splash (0.5s) → Onboarding (첫 진입) → Terms (약관 미동의 시) → Main
 //
-//  isOnboarded / isAuthenticated 는 UserDefaults 로 영속화.
-//  (@AppStorage 는 ObservableObject 안에서 동작 안 함 — View 전용)
+//  isOnboarded / isAuthenticated / hasAgreedToTerms 는 UserDefaults 로 영속화.
 //
 
 import SwiftUI
@@ -18,11 +16,13 @@ final class AppState: ObservableObject {
     private enum Key {
         static let isOnboarded = "isOnboarded"
         static let isAuthenticated = "isAuthenticated"
+        static let hasAgreedToTerms = "hasAgreedToTerms"
     }
 
     enum Route {
         case splash
         case onboarding
+        case terms       // 약관 동의 — onboarding 다음, main 이전
         case auth
         case main
     }
@@ -32,6 +32,9 @@ final class AppState: ObservableObject {
     }
     @Published var isAuthenticated: Bool {
         didSet { UserDefaults.standard.set(isAuthenticated, forKey: Key.isAuthenticated) }
+    }
+    @Published var hasAgreedToTerms: Bool {
+        didSet { UserDefaults.standard.set(hasAgreedToTerms, forKey: Key.hasAgreedToTerms) }
     }
     @Published var route: Route
     @Published var currentUser: UserPublic?
@@ -46,14 +49,16 @@ final class AppState: ObservableObject {
         let d = UserDefaults.standard
         self.isOnboarded = d.bool(forKey: Key.isOnboarded)
         self.isAuthenticated = d.bool(forKey: Key.isAuthenticated)
+        self.hasAgreedToTerms = d.bool(forKey: Key.hasAgreedToTerms)
         self.route = .splash
     }
 
     func decideAfterSplash() {
         if !isOnboarded {
             route = .onboarding
+        } else if !hasAgreedToTerms {
+            route = .terms
         } else {
-            // 로그인 안 했어도 게스트로 spotlight/search 가능
             route = .main
         }
     }
@@ -95,6 +100,9 @@ struct AppRoot: View {
             case .onboarding:
                 OnboardingView()
                     .environmentObject(state)
+            case .terms:
+                TermsGateView()
+                    .environmentObject(state)
             case .auth:
                 AuthView()
                     .environmentObject(state)
@@ -104,6 +112,7 @@ struct AppRoot: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: state.route)
+        .tint(Color(.label))    // 전역 액센트 → 검정 계열
     }
 }
 

@@ -97,8 +97,8 @@ struct WatchlistManageView: View {
             Text(item.ticker)
                 .font(.caption2.weight(.bold))
                 .padding(.horizontal, 8).padding(.vertical, 5)
-                .background(Color.blue.opacity(0.15))
-                .foregroundStyle(.blue)
+                .background(Color.gray.opacity(0.15))
+                .foregroundStyle(Color(.label))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .frame(width: 60, alignment: .center)
 

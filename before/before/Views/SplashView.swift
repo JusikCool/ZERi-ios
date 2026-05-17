@@ -18,7 +18,7 @@ struct SplashView: View {
                         .foregroundStyle(Color(.label))
                     Text(".")
                         .font(.system(size: 56, weight: .bold))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Color(.label))
                 }
             }
         }

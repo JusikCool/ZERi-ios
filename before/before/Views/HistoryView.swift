@@ -200,8 +200,8 @@ struct HistoryView: View {
 
     private func outcomeColor(_ outcome: String?) -> Color {
         switch outcome {
-        case "price_dropped": return .red
-        case "price_rose":    return .blue
+        case "price_dropped": return Color.riskRed
+        case "price_rose":    return Color.trendUp
         case "flat":          return .secondary
         default:               return .secondary
         }

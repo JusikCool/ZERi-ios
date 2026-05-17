@@ -23,7 +23,7 @@ struct MainTabView: View {
             MyPageView()
                 .tabItem { Label("마이", systemImage: "person.fill") }
         }
-        .tint(.blue)
+        .tint(Color(.label))
     }
 }
 

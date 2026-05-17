@@ -22,9 +22,17 @@ struct HomeView: View {
                     // Brand
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("before").font(.title.weight(.bold))
-                        Text(".").font(.title.weight(.bold)).foregroundStyle(.blue)
+                        Text(".").font(.title.weight(.bold)).foregroundStyle(Color(.label))
                         Spacer()
-                        ProfileBubble(initial: state.isAuthenticated ? state.userInitial : nil)
+                        Button {
+                            if !state.isAuthenticated {
+                                state.route = .auth
+                            }
+                            // 인증 상태면 마이 탭으로 전환 (상위 TabView 가 처리하므로 여기선 noop)
+                        } label: {
+                            ProfileBubble(initial: state.isAuthenticated ? state.userInitial : nil)
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 4)
@@ -248,7 +256,7 @@ struct HomeView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Text(String(format: "%.1f%%", pct * 100))
                     .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.riskRed)
                 Text("과거 유사 변동성 구간의 통계적 추정치이며, 미래 가격을 예측하지 않습니다.")
                     .font(.caption2).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -284,21 +292,37 @@ struct HomeView: View {
 }
 
 private struct ProfileBubble: View {
-    let initial: String?    // nil 이면 게스트 아이콘
+    let initial: String?    // nil 이면 게스트 (로그인 캡슐 표시)
 
     var body: some View {
-        Circle()
-            .fill(Color.blue.opacity(0.15))
-            .frame(width: 32, height: 32)
-            .overlay(
-                Group {
-                    if let s = initial {
-                        Text(s).font(.caption.weight(.bold)).foregroundStyle(.blue)
-                    } else {
-                        Image(systemName: "person").font(.caption).foregroundStyle(.blue)
-                    }
-                }
+        if let s = initial {
+            // 인증 — 이니셜 원형
+            Circle()
+                .fill(Color.gray.opacity(0.15))
+                .frame(width: 36, height: 36)
+                .overlay(
+                    Text(s).font(.caption.weight(.bold)).foregroundStyle(Color(.label))
+                )
+        } else {
+            // 게스트 — "로그인" 캡슐 (탭 유도)
+            HStack(spacing: 4) {
+                Image(systemName: "person.crop.circle")
+                    .font(.subheadline)
+                Text("로그인")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(Color(.label))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(Color(.secondarySystemBackground))
             )
+            .overlay(
+                Capsule()
+                    .stroke(Color(.separator), lineWidth: 0.5)
+            )
+        }
     }
 }
 

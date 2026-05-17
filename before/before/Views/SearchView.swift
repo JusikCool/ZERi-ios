@@ -80,7 +80,7 @@ struct SearchView: View {
                                             Image(systemName: favoriteTickers.contains(item.ticker)
                                                   ? "heart.fill" : "plus.circle")
                                                 .foregroundStyle(favoriteTickers.contains(item.ticker)
-                                                                  ? .red : .blue)
+                                                                  ? .red : Color(.label))
                                         }
                                         .buttonStyle(.plain)
                                     }

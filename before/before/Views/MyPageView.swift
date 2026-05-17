@@ -86,7 +86,7 @@ struct MyPageView: View {
                         }
                     }
                     NavigationLink {
-                        Text("알림 설정 화면")
+                        NotificationSettingsView()
                     } label: {
                         HStack {
                             Label("알림 설정", systemImage: "bell")
@@ -95,23 +95,32 @@ struct MyPageView: View {
                         }
                     }
                     NavigationLink {
-                        Text("약관·면책 동의 이력")
+                        TermsHistoryView()
                     } label: {
                         HStack {
                             Label("약관 및 면책 동의 이력", systemImage: "doc.text")
                             Spacer()
-                            Text("2건 동의").font(.caption).foregroundStyle(.secondary)
+                            Text("\(TermsConsentStore.loadAll().count)건 동의").font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    Button(role: .destructive) {
-                        Task {
-                            try? await AuthAPI.logout()   // refresh revoke + Keychain clear
-                            state.isAuthenticated = false
-                            state.currentUser = nil
-                            state.route = .auth
+                    if state.isAuthenticated {
+                        Button(role: .destructive) {
+                            Task {
+                                try? await AuthAPI.logout()
+                                state.isAuthenticated = false
+                                state.currentUser = nil
+                                state.route = .auth
+                            }
+                        } label: {
+                            Label("로그아웃", systemImage: "rectangle.portrait.and.arrow.right")
                         }
-                    } label: {
-                        Label("로그아웃", systemImage: "rectangle.portrait.and.arrow.right")
+                    } else {
+                        Button {
+                            state.route = .auth
+                        } label: {
+                            Label("로그인 / 회원가입", systemImage: "person.crop.circle.badge.plus")
+                                .foregroundStyle(Color(.label))
+                        }
                     }
                 }
 
@@ -137,9 +146,9 @@ struct MyPageView: View {
         let daysSince = daysSinceCreated(user.createdAt)
         return HStack(spacing: 12) {
             Circle()
-                .fill(Color.blue.opacity(0.15))
+                .fill(Color.gray.opacity(0.15))
                 .frame(width: 48, height: 48)
-                .overlay(Text(initial).font(.title3.weight(.bold)).foregroundStyle(.blue))
+                .overlay(Text(initial).font(.title3.weight(.bold)).foregroundStyle(Color(.label)))
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.name).font(.headline)
                 Text("\(user.email)\(daysSince.map { " · 가입 \($0)일째" } ?? "")")
@@ -189,7 +198,7 @@ struct MyPageView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 + Text("\(downCount)건")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.red)
+                    .foregroundColor(Color.riskRed)
             }
             ProgressView(value: ratio).tint(.red)
         }

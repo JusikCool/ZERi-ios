@@ -79,7 +79,7 @@ struct WorstCaseCard: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             Text(pctText)
                 .font(.system(size: 64, weight: .bold, design: .rounded))
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.riskRed)
                 .frame(maxWidth: .infinity, alignment: .center)
             Text("과거 유사 변동성 구간의 통계적 추정치입니다.\n특정 가격을 예측하거나 보장하지 않습니다.")
                 .font(.footnote)
@@ -151,7 +151,7 @@ struct FanChartLite: View {
                     y: .value("Q05", q05[i]),
                     series: .value("S", "Q05")
                 )
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.riskRed)
                 .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
                 .interpolationMethod(.monotone)
             }
@@ -163,7 +163,7 @@ struct FanChartLite: View {
                     y: .value("Q15", q15[i]),
                     series: .value("S", "Q15")
                 )
-                .foregroundStyle(Color.red.opacity(0.65))
+                .foregroundStyle(Color.riskRedSoft)
                 .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
                 .interpolationMethod(.monotone)
             }
@@ -183,14 +183,14 @@ struct FanChartLite: View {
                     x: .value("Day", day),
                     y: .value("Q05", q05[day - 1])
                 )
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.riskRed)
                 .symbolSize(80)
 
                 PointMark(
                     x: .value("Day", day),
                     y: .value("Q15", q15[day - 1])
                 )
-                .foregroundStyle(Color.red.opacity(0.65))
+                .foregroundStyle(Color.riskRedSoft)
                 .symbolSize(50)
             }
         }
@@ -267,13 +267,13 @@ struct FanChartLite: View {
                 Circle().fill(.red).frame(width: 5, height: 5)
                 Text(String(format: "%.2f%%", q05Val * 100))
                     .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.riskRed)
             }
             HStack(spacing: 3) {
                 Circle().fill(.red.opacity(0.65)).frame(width: 5, height: 5)
                 Text(String(format: "%.2f%%", q15Val * 100))
                     .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.red.opacity(0.75))
+                    .foregroundStyle(Color.riskRedSoft)
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -311,7 +311,7 @@ struct TickerRow: View {
                     if let c = priceChangePct {
                         Text(String(format: "%+.1f%%", c * 100))
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(c >= 0 ? .red : .blue)
+                            .foregroundStyle(c >= 0 ? Color.riskRed : Color.trendUp)
                     }
                 }
             }
@@ -321,7 +321,7 @@ struct TickerRow: View {
                     Text("변동성 추정").font(.caption2).foregroundStyle(.secondary)
                     Text(String(format: "%.1f%%", w * 100))
                         .font(.headline.weight(.bold))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.riskRed)
                 }
             } else if let g = grade {
                 RiskBadge(grade: g, compact: true)

@@ -15,7 +15,7 @@ struct OnboardingView: View {
             Spacer()
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text("before").font(.system(size: 40, weight: .bold))
-                Text(".").font(.system(size: 40, weight: .bold)).foregroundStyle(.blue)
+                Text(".").font(.system(size: 40, weight: .bold)).foregroundStyle(Color(.label))
             }
             .padding(.bottom, 28)
 
@@ -42,7 +42,7 @@ struct OnboardingView: View {
 
             Button {
                 state.isOnboarded = true
-                state.route = .main
+                state.route = state.hasAgreedToTerms ? .main : .terms
             } label: {
                 Text("시작하기")
                     .font(.headline)
@@ -55,9 +55,11 @@ struct OnboardingView: View {
             .padding(.horizontal, 28)
 
             Button {
-                state.route = .auth
+                state.isOnboarded = true
+                state.route = state.hasAgreedToTerms ? .auth : .terms
             } label: {
                 Text("이미 계정이 있어요").font(.subheadline)
+                    .foregroundStyle(Color(.label))
             }
             .padding(.top, 8)
 
@@ -81,7 +83,7 @@ private struct FeatureRow: View {
         HStack(alignment: .top, spacing: 14) {
             Text(num)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color(.label))
                 .frame(width: 28, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.subheadline.weight(.semibold))

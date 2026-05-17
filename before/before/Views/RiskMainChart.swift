@@ -85,7 +85,7 @@ struct RiskMainChart: View {
                     y: .value("Q05", p.value),
                     series: .value("S", "q05")
                 )
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.riskRed)
                 .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
                 .interpolationMethod(.monotone)
             }
@@ -97,7 +97,7 @@ struct RiskMainChart: View {
                     y: .value("Q15", p.value),
                     series: .value("S", "q15")
                 )
-                .foregroundStyle(Color.red.opacity(0.65))
+                .foregroundStyle(Color.riskRedSoft)
                 .lineStyle(StrokeStyle(lineWidth: 1.6, dash: [4, 4]))
                 .interpolationMethod(.monotone)
             }
@@ -125,12 +125,12 @@ struct RiskMainChart: View {
                     x: .value("Day", futureCount),
                     y: .value("Worst", q05[futureCount - 1])
                 )
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.riskRed)
                 .symbolSize(80)
                 .annotation(position: .topTrailing, alignment: .leading) {
                     Text(String(format: "%.1f%%", worstCasePct * 100))
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.riskRed)
                         .padding(.horizontal, 6).padding(.vertical, 3)
                         .background(Color(.systemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 4))

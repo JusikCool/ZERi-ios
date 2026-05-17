@@ -151,7 +151,7 @@ struct VerdictView: View {
 
         Text("\(v.prediction.modelName) \(v.prediction.modelVersion)")
             .font(.caption2.monospaced())
-            .foregroundStyle(.quaternary)
+            .foregroundStyle(.tertiary)
             .padding(.top, 4)
             .padding(.bottom, 24)
     }
@@ -273,9 +273,9 @@ private struct DailyBreakdownCard: View {
                     Text("일").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
                         .frame(width: 60, alignment: .leading)
                     Spacer()
-                    Text("Q05 (최악)").font(.caption2.weight(.bold)).foregroundStyle(.red.opacity(0.8))
+                    Text("Q05 (최악)").font(.caption2.weight(.bold)).foregroundStyle(Color.riskRedSoft)
                         .frame(width: 90, alignment: .trailing)
-                    Text("Q15 (보통)").font(.caption2.weight(.bold)).foregroundStyle(.red.opacity(0.5))
+                    Text("Q15 (보통)").font(.caption2.weight(.bold)).foregroundStyle(Color.riskRedSoft)
                         .frame(width: 90, alignment: .trailing)
                 }
                 .padding(.horizontal, 16)
@@ -308,11 +308,11 @@ private struct DailyBreakdownCard: View {
             Spacer()
             Text(String(format: "%+.2f%%", q05Value * 100))
                 .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.riskRed)
                 .frame(width: 90, alignment: .trailing)
             Text(String(format: "%+.2f%%", q15Value * 100))
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(.red.opacity(0.7))
+                .foregroundStyle(Color.riskRedSoft)
                 .frame(width: 90, alignment: .trailing)
         }
         .padding(.horizontal, 16)
@@ -391,7 +391,7 @@ struct XAISheet: View {
                 Spacer()
                 Text(String(format: "%.0f%%", f.weight * 100))
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.riskRed)
             }
             ProgressView(value: min(max(f.weight, 0), 1))
                 .tint(.red)
