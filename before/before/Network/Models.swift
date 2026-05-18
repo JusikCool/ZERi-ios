@@ -137,10 +137,47 @@ struct RiskXaiFeature: Decodable, Sendable, Identifiable {
     let weight: Double
     let label: String
     let description: String?
+    /// 보조 지표 라벨 (예: "최근 10일 실현 변동성")
+    let auxLabel: String?
+    /// 보조 지표 값 (예: "평소 대비 2.3배")
+    let auxValue: String?
+    /// 해석 — 모델 입력 기반 의미 (rule-based 또는 LLM summary)
+    let interpretation: String?
+    /// 사용자가 함께 확인할 것 (행동 안내)
+    let actionHint: String?
+
+    enum CodingKeys: String, CodingKey {
+        case feature, weight, label, description
+        case auxLabel = "aux_label"
+        case auxValue = "aux_value"
+        case interpretation
+        case actionHint = "action_hint"
+    }
+}
+
+/// 백테스트 기반 신뢰 평가 (Coverage / Kupiec test 결과)
+struct RiskXaiBacktest: Decodable, Sendable {
+    let coveragePct: Double?       // 0.91 → 91%
+    let kupiecPass: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case coveragePct = "coverage_pct"
+        case kupiecPass = "kupiec_pass"
+    }
 }
 
 struct RiskXaiSection: Decodable, Sendable {
     let features: [RiskXaiFeature]
+    /// 요약 카드 하단 행동 가이드 (rule-based)
+    let actionGuide: String?
+    /// 백테스트 기반 신뢰 평가
+    let backtest: RiskXaiBacktest?
+
+    enum CodingKeys: String, CodingKey {
+        case features
+        case actionGuide = "action_guide"
+        case backtest
+    }
 }
 
 struct RiskVerdictData: Decodable, Sendable {
@@ -188,11 +225,15 @@ struct RiskAttentionData: Decodable, Sendable {
     let ticker: String
     let baseDate: String
     let features: [RiskXaiFeature]
+    let actionGuide: String?
+    let backtest: RiskXaiBacktest?
 
     enum CodingKeys: String, CodingKey {
         case ticker
         case baseDate = "base_date"
         case features
+        case actionGuide = "action_guide"
+        case backtest
     }
 }
 

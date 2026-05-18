@@ -51,9 +51,14 @@ struct VerdictView: View {
             }
         }
         .sheet(isPresented: $showXAI) {
-            XAISheet(narrative: verdict?.summaryNarrative, features: attention?.features ?? verdict?.xai?.features)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+            XAISheet(
+                narrative: verdict?.summaryNarrative,
+                features: attention?.features ?? verdict?.xai?.features,
+                actionGuide: attention?.actionGuide ?? verdict?.xai?.actionGuide,
+                backtest: attention?.backtest ?? verdict?.xai?.backtest
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .task { await load() }
         .refreshable { await load() }
@@ -333,36 +338,27 @@ private struct DailyBreakdownCard: View {
 }
 
 // MARK: - XAI Sheet
+//
+// 본 시트는 뉴스/공시 등 텍스트 근거를 사후 결합하지 않는다.
+// 모델 입력 (가격·거래량·변동성·기술적 지표·거시지표) 에 한정한 XAI 설명만 노출한다.
+// TFT 변수 선택 + attention weight → rule-based JSON → LLM summary 의 결과를 그대로 렌더링한다.
 
 struct XAISheet: View {
     let narrative: String?
     let features: [RiskXaiFeature]?
+    let actionGuide: String?
+    let backtest: RiskXaiBacktest?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    // Summary
-                    if let n = narrative, !n.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("요약").font(.caption.weight(.bold)).foregroundStyle(.secondary)
-                            Text(n).font(.body)
-                        }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
+                    summaryCard
 
                     if let feats = features, !feats.isEmpty {
-                        HStack {
-                            Text("핵심 영향 변수").font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text("\(feats.count)개 변수").font(.caption).foregroundStyle(.secondary)
-                        }
-                        VStack(spacing: 8) {
-                            ForEach(feats) { f in
-                                xaiRow(f)
+                        VStack(spacing: 12) {
+                            ForEach(Array(feats.enumerated()), id: \.element.id) { idx, f in
+                                FeatureCard(rank: idx + 1, feature: f)
                             }
                         }
                     } else {
@@ -379,29 +375,157 @@ struct XAISheet: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("상세 분석")
+            .navigationTitle("왜 위험한가요?")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
-    private func xaiRow(_ f: RiskXaiFeature) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(f.label).font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(String(format: "%.0f%%", f.weight * 100))
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Color.riskRed)
+    // MARK: 요약 카드
+    @ViewBuilder
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("요약")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+
+            if let n = narrative, !n.isEmpty {
+                Text(n).font(.body)
             }
-            ProgressView(value: min(max(f.weight, 0), 1))
-                .tint(.red)
-            if let desc = f.description {
-                Text(desc).font(.caption).foregroundStyle(.secondary)
+
+            if let bt = backtest, bt.coveragePct != nil || bt.kupiecPass != nil {
+                BacktestInset(backtest: bt)
+            }
+
+            if let guide = actionGuide, !guide.isEmpty {
+                ActionGuideInset(text: guide)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+// MARK: 요약 카드 내부 inset — 백테스트 신뢰 평가
+private struct BacktestInset: View {
+    let backtest: RiskXaiBacktest
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("백테스트 기반 신뢰 평가")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                if let cov = backtest.coveragePct {
+                    Text(String(format: "Coverage %.0f%%", cov * 100))
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                }
+                if backtest.coveragePct != nil && backtest.kupiecPass != nil {
+                    Text("·").foregroundStyle(.tertiary)
+                }
+                if let pass = backtest.kupiecPass {
+                    Text(pass ? "Kupiec pass" : "Kupiec fail")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(pass ? Color(.label) : Color.riskRed)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.tertiarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+// MARK: 요약 카드 내부 inset — 행동 가이드
+private struct ActionGuideInset: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(Color(.label))
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.riskRedSoft.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+// MARK: - Feature Card (번호 + 이름 + % + bar + 보조지표 + 해석 + 확인사항)
+private struct FeatureCard: View {
+    let rank: Int
+    let feature: RiskXaiFeature
+
+    private var accent: Color {
+        feature.weight >= 0.30 ? Color.riskRed : Color.riskRedSoft
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 헤더 — 번호 + 라벨 + 퍼센트
+            HStack(alignment: .center, spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.riskRedSoft.opacity(0.18))
+                        .frame(width: 22, height: 22)
+                    Text("\(rank)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.riskRed)
+                }
+                Text(feature.label)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(String(format: "%.0f%%", feature.weight * 100))
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(accent)
+            }
+
+            ProgressView(value: min(max(feature.weight, 0), 1))
+                .tint(accent)
+
+            // 보조 지표 inset (auxLabel + auxValue)
+            if let auxLabel = feature.auxLabel, let auxValue = feature.auxValue {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(auxLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(auxValue)
+                        .font(.subheadline.weight(.semibold))
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.tertiarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+
+            // 해석
+            if let interp = feature.interpretation ?? feature.description, !interp.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("해석")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    Text(interp)
+                        .font(.footnote)
+                        .foregroundStyle(Color(.label))
+                }
+            }
+
+            // 확인하세요
+            if let action = feature.actionHint, !action.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("확인하세요")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    Text(action)
+                        .font(.footnote)
+                        .foregroundStyle(Color(.label))
+                }
             }
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
