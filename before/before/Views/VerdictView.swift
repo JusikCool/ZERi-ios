@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct VerdictView: View {
     let ticker: String
@@ -20,6 +21,7 @@ struct VerdictView: View {
     @State private var showXAI = false
     @State private var isFavorite = false
     @State private var favoriteToggling = false
+    @State private var showLoginPrompt = false   // 비로그인 사용자가 좋아요 탭 시 alert
 
     var body: some View {
         ScrollView {
@@ -37,6 +39,7 @@ struct VerdictView: View {
             }
             .padding(20)
         }
+        .scrollIndicators(.hidden)
         .background(Color(.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -47,12 +50,24 @@ struct VerdictView: View {
                     Image(systemName: isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(isFavorite ? .red : Color(.label))
                 }
-                .disabled(favoriteToggling || !state.isAuthenticated)
+                // 비로그인이어도 탭은 가능 — toggleFavorite 안에서 alert 분기.
+                .disabled(favoriteToggling)
             }
         }
+        .alert("로그인이 필요해요", isPresented: $showLoginPrompt) {
+            Button("취소", role: .cancel) {}
+            Button("로그인하기") {
+                Haptics.light()
+                state.route = .auth
+            }
+        } message: {
+            Text("관심 종목 등록은 로그인 후에 이용할 수 있어요.")
+        }
         .sheet(isPresented: $showXAI) {
+            // 메인 화면 AINarrativeCard 가 이미 narrative 를 노출하므로 시트에서는 제거.
+            // 시트는 "더 깊은 근거" 역할 — 백테스트 + 액션가이드 + top features.
             XAISheet(
-                narrative: verdict?.summaryNarrative,
+                narrative: nil,
                 features: attention?.features ?? verdict?.xai?.features,
                 actionGuide: attention?.actionGuide ?? verdict?.xai?.actionGuide,
                 backtest: attention?.backtest ?? verdict?.xai?.backtest
@@ -126,8 +141,20 @@ struct VerdictView: View {
         // 30-day daily breakdown (펼치기/접기)
         DailyBreakdownCard(q05: q05, q15: q15, baseDate: v.prediction.baseDate)
 
+        // AI 해설 카드 — 차트로 시각 이해 후 자연어 해설 순서.
+        // detailedNarrative 없으면 summaryNarrative 로 폴백, 둘 다 없으면 카드 자체 숨김.
+        if let narrative = v.detailedNarrative ?? v.summaryNarrative, !narrative.isEmpty {
+            AINarrativeCard(
+                narrative: narrative,
+                isPolished: v.detailedNarrative != nil,
+                baseDate: v.detailedNarrativeBaseDate,
+                asOf: v.asOf
+            )
+        }
+
         // "왜 이런 결과?" button
         Button {
+            Haptics.light()
             showXAI = true
         } label: {
             HStack {
@@ -186,6 +213,13 @@ struct VerdictView: View {
             // 메인 verdict 는 필수 (실패 시 화면 못 띄움)
             self.verdict = try await RiskAPI.verdict(ticker: ticker)
 
+            // 최근 조회 종목 기록 — 검색 탭 "최근 조회"에 자동 반영.
+            // 실패해도 화면 동작에는 영향 없으므로 fire-and-forget.
+            RecentTickersStore.add(
+                ticker: ticker,
+                companyNameKr: self.verdict?.companyNameKr
+            )
+
             // 보조 데이터들은 병렬, 실패해도 메인 화면 유지
             async let attentionData = try? await RiskAPI.attention(ticker: ticker)
             async let pathDataResult = try? await RiskAPI.path(ticker: ticker)
@@ -194,8 +228,11 @@ struct VerdictView: View {
             self.attention = await attentionData
             self.pathData = await pathDataResult
             self.pastPrices = (await historyData)?.items ?? []
+        } catch where error.isCancellation {
+            // 탭 전환/view rebuild 로 인한 취소 → 무시
         } catch {
             self.errorMessage = error.localizedDescription
+            Haptics.notify(.error)    // 로드 실패 → 에러 햅틱
         }
         loading = false
 
@@ -208,10 +245,17 @@ struct VerdictView: View {
     }
 
     private func toggleFavorite() async {
-        guard state.isAuthenticated, !favoriteToggling else { return }
+        guard !favoriteToggling else { return }
+        // 비로그인 → 시스템 alert 띄워 로그인 유도. 햅틱 warning 으로 "막힘" 신호.
+        guard state.isAuthenticated else {
+            Haptics.notify(.warning)
+            showLoginPrompt = true
+            return
+        }
         favoriteToggling = true
         let prev = isFavorite
         isFavorite.toggle()    // optimistic
+        Haptics.impact(.medium)    // 사용자가 즉시 인지하도록 optimistic 시점에 발화
         do {
             if prev {
                 _ = try await WatchlistAPI.remove(ticker: ticker)
@@ -220,8 +264,33 @@ struct VerdictView: View {
             }
         } catch {
             isFavorite = prev    // 롤백
+            Haptics.notify(.error)    // 롤백 = 사용자의 의도와 어긋남 → 에러 햅틱
         }
         favoriteToggling = false
+    }
+}
+
+// MARK: 에러 헬퍼 — Task / URLSession 취소는 사용자 의도와 무관하므로 alert 에서 제외.
+// .task 가 view rebuild 시 자동 cancel 되는 정상 흐름까지 alert 로 띄우면 cancelled 가 폭증.
+extension Error {
+    var isCancellation: Bool {
+        if self is CancellationError { return true }
+        if let url = self as? URLError, url.code == .cancelled { return true }
+        return false
+    }
+}
+
+// MARK: 햅틱 헬퍼 — UIKit 의존성을 한곳에 모아 캡슐화.
+// 사용 정책: 사용자 의도가 시스템에 반영된 시점에 한 번. 단순 스크롤/탐색엔 X.
+enum Haptics {
+    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+        let g = UIImpactFeedbackGenerator(style: style)
+        g.prepare()
+        g.impactOccurred()
+    }
+    static func light() { impact(.light) }
+    static func notify(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        UINotificationFeedbackGenerator().notificationOccurred(type)
     }
 }
 
@@ -297,6 +366,7 @@ private struct DailyBreakdownCard: View {
                         }
                     }
                 }
+                .scrollIndicators(.hidden)
                 .frame(maxHeight: 360)
             }
         }
@@ -343,17 +413,111 @@ private struct DailyBreakdownCard: View {
 // 모델 입력 (가격·거래량·변동성·기술적 지표·거시지표) 에 한정한 XAI 설명만 노출한다.
 // TFT 변수 선택 + attention weight → rule-based JSON → LLM summary 의 결과를 그대로 렌더링한다.
 
+// MARK: AI 해설 카드 — 차트 시각 이해 → 자연어 해설 순서로 배치.
+// detailedNarrative(LLM 정제)가 있으면 "AI 해설" 라벨 + 보라 accent,
+// 없으면 summaryNarrative(rule-based) 로 폴백 + 회색 톤.
+struct AINarrativeCard: View {
+    let narrative: String
+    let isPolished: Bool       // true 면 Upstage Solar 정제본, false 면 template fallback
+    let baseDate: String?      // detailedNarrative 기준일 (asOf 와 다르면 묵은 데이터)
+    let asOf: String
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isStale: Bool {
+        guard let base = baseDate else { return false }
+        return base != asOf
+    }
+
+    // 보라 = AI 컨텐츠, 회색 = rule-based 폴백.
+    // 다크 모드에서는 SwiftUI 기본 .purple 이 너무 형광 → 라이트/다크 톤 분리.
+    // 라이트: 표준 purple (눈에 잘 띔)
+    // 다크: systemIndigo 톤 (차분한 보라, 흰 텍스트와 대비도 유지)
+    private var accent: Color {
+        guard isPolished else { return Color(.systemGray2) }
+        return colorScheme == .dark ? Color(.systemIndigo) : Color(.systemPurple)
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            // 왼쪽 accent bar — "인용/특별 컨텐츠" 시각 신호. 글자 늘어나면 같이 늘어남.
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(accent)
+                .frame(width: 3)
+
+            VStack(alignment: .leading, spacing: 12) {
+                // 헤더 라인 — 아이콘 + 라벨 + (묵은 데이터면) 기준일
+                HStack(spacing: 6) {
+                    Image(systemName: isPolished ? "sparkles" : "text.alignleft")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(accent)
+                    Text(isPolished ? "AI 해설" : "요약")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(accent)
+                        .textCase(.none)
+                    if isStale, let base = baseDate {
+                        Text("· \(base) 기준")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                }
+
+                // 본문 — 가독성 핵심. body 크기 + serif design + lineSpacing 으로 신문 사설 톤.
+                // Dynamic Type 따라가도록 .system(.body, design:) 사용.
+                Text(narrative)
+                    .font(.system(.body, design: .serif))
+                    .foregroundStyle(Color(.label))
+                    .lineSpacing(6)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)    // 길게 눌러 복사 (Apple 표준 행동)
+            }
+        }
+        .padding(.vertical, 18)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            // 살짝 그라데이션 — AI 컨텐츠를 다른 카드와 차별화.
+            // 폴백 상태에서는 거의 평탄해 보이도록 회색 톤 + 약한 대비.
+            // 다크에선 동일 opacity 가 너무 흐릿해 보여 살짝 더 강하게.
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: isPolished
+                            ? [
+                                Color(.secondarySystemBackground),
+                                accent.opacity(colorScheme == .dark ? 0.12 : 0.06)
+                              ]
+                            : [Color(.secondarySystemBackground), Color(.secondarySystemBackground)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+    }
+}
+
 struct XAISheet: View {
     let narrative: String?
     let features: [RiskXaiFeature]?
     let actionGuide: String?
     let backtest: RiskXaiBacktest?
 
+    // 시트 안에 보여줄 게 하나라도 있나 — 셋 다 비면 요약 카드 자체를 숨김.
+    private var hasSummaryContent: Bool {
+        let n = (narrative?.isEmpty == false)
+        let b = (backtest?.coveragePct != nil) || (backtest?.kupiecPass != nil)
+        let g = (actionGuide?.isEmpty == false)
+        return n || b || g
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    summaryCard
+                    if hasSummaryContent {
+                        summaryCard
+                    }
 
                     if let feats = features, !feats.isEmpty {
                         VStack(spacing: 12) {
@@ -375,16 +539,18 @@ struct XAISheet: View {
                 }
                 .padding(20)
             }
+            .scrollIndicators(.hidden)
             .navigationTitle("왜 위험한가요?")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
-    // MARK: 요약 카드
+    // MARK: 요약 카드 — narrative 는 메인 화면에서 노출되므로 시트에서는 backtest + actionGuide 중심.
     @ViewBuilder
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("요약")
+            // 헤더 라벨 — narrative 있으면 "요약", 없으면 컨텐츠에 맞춰 "신뢰 평가".
+            Text((narrative?.isEmpty == false) ? "요약" : "신뢰 평가")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
 

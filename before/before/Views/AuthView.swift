@@ -189,6 +189,7 @@ struct AuthView: View {
                 }
                 .padding(.horizontal, 28)
             }
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -303,3 +304,4 @@ private struct CleanField: View {
 }
 
 #Preview { AuthView().environmentObject(AppState()) }
+

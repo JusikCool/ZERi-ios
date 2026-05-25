@@ -3,39 +3,127 @@
 //  before
 //
 //  탭 2 — 검색. TickersAPI.search() 비동기 호출 + debounce.
+//  "최근 조회 종목" 영속화 — VerdictView 진입 시 자동 기록 (RecentTickersStore).
 //
 
 import SwiftUI
 
+// MARK: - 최근 조회 종목 — VerdictView 진입 시 자동 기록, 검색 탭에서 노출.
+// 검색어 텍스트가 아니라 실제로 상세 페이지를 본 종목만 누적. JSON 영속화.
+struct RecentTickerItem: Codable, Equatable, Identifiable {
+    let ticker: String
+    let companyNameKr: String?
+    var id: String { ticker }
+}
+
+enum RecentTickersStore {
+    private static let key = "recent.viewed.v1"
+    private static let maxCount = 10
+
+    static func load() -> [RecentTickerItem] {
+        guard
+            let data = UserDefaults.standard.data(forKey: key),
+            let items = try? JSONDecoder().decode([RecentTickerItem].self, from: data)
+        else { return [] }
+        return items
+    }
+
+    static func save(_ items: [RecentTickerItem]) {
+        let trimmed = Array(items.prefix(maxCount))
+        if let data = try? JSONEncoder().encode(trimmed) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    static func add(ticker: String, companyNameKr: String?) {
+        var items = load()
+        items.removeAll { $0.ticker == ticker }   // 중복 제거 (최신 진입을 위로)
+        items.insert(RecentTickerItem(ticker: ticker, companyNameKr: companyNameKr), at: 0)
+        save(items)
+    }
+
+    static func remove(ticker: String) {
+        var items = load()
+        items.removeAll { $0.ticker == ticker }
+        save(items)
+    }
+
+    static func clear() { save([]) }
+}
+
 struct SearchView: View {
     @EnvironmentObject var state: AppState
     @State private var query = ""
-    @State private var recent: [String] = []
     @State private var results: [TickerSearchItem] = []
     @State private var loading = false
     @State private var searchTask: Task<Void, Never>?
     @State private var favoriteTickers: Set<String> = []
+    // 최근 조회 종목 — VerdictView 가 write, 여기선 read. 탭 진입/돌아옴 시 refresh.
+    @State private var recentViewed: [RecentTickerItem] = []
 
     var body: some View {
         NavigationStack {
             List {
                 if query.isEmpty {
-                    if !recent.isEmpty {
-                        Section("최근 검색") {
-                            ForEach(recent, id: \.self) { q in
-                                HStack {
-                                    Image(systemName: "clock").foregroundStyle(.secondary)
-                                    Text(q)
-                                    Spacer()
-                                    Button {
-                                        recent.removeAll { $0 == q }
-                                    } label: {
-                                        Image(systemName: "xmark").font(.caption).foregroundStyle(.secondary)
+                    if recentViewed.isEmpty {
+                        // 빈 상태 — Apple HIG 의 empty state 패턴 (아이콘 + 메시지 + 안내).
+                        VStack(spacing: 10) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
+                            Text("최근 조회한 종목이 없어요")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text("위 검색창에서 종목을 찾아보세요.")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    } else {
+                        Section {
+                            ForEach(recentViewed) { item in
+                                NavigationLink {
+                                    VerdictView(ticker: item.ticker)
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "clock")
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 18)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            // 회사명 (한글) 메인, 없으면 ticker fallback
+                                            Text(item.companyNameKr ?? item.ticker)
+                                                .font(.body)
+                                                .foregroundStyle(Color(.label))
+                                            Text(item.ticker)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
                                     }
-                                    .buttonStyle(.plain)
                                 }
-                                .contentShape(Rectangle())
-                                .onTapGesture { query = q }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        RecentTickersStore.remove(ticker: item.ticker)
+                                        recentViewed = RecentTickersStore.load()
+                                    } label: {
+                                        Label("삭제", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        } header: {
+                            HStack {
+                                Text("최근 조회 종목")
+                                Spacer()
+                                Button("전체 삭제") {
+                                    RecentTickersStore.clear()
+                                    recentViewed = []
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textCase(nil)
                             }
                         }
                     }
@@ -91,20 +179,20 @@ struct SearchView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollIndicators(.hidden)
             .navigationTitle("검색")
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "티커 / 한글명 / 영문명")
             .task {
                 await loadFavorites()
+                recentViewed = RecentTickersStore.load()
+            }
+            // 다른 탭에서 verdict 본 후 검색 탭 돌아올 때 최신화.
+            .onAppear {
+                recentViewed = RecentTickersStore.load()
             }
             .onChange(of: query) { _, newValue in
                 triggerSearch(newValue)
-            }
-            .onSubmit(of: .search) {
-                let trimmed = query.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty else { return }
-                if !recent.contains(trimmed) { recent.insert(trimmed, at: 0) }
-                if recent.count > 5 { recent = Array(recent.prefix(5)) }
             }
         }
     }

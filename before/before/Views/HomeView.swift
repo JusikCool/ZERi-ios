@@ -14,6 +14,8 @@ struct HomeView: View {
     @State private var loading = true
     @State private var errorMessage: String?
     @State private var watchlist: [WatchlistItem] = []
+    // 관심 종목별 위험 데이터 — ticker → (grade, worstCasePct). watchlist 로드 후 병렬 fetch.
+    @State private var watchlistRisk: [String: (grade: String, worstCasePct: Double)] = [:]
 
     var body: some View {
         NavigationStack {
@@ -37,9 +39,9 @@ struct HomeView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 4)
 
-                    // Search bar
-                    NavigationLink {
-                        SearchView()
+                    // Search bar — 탭 전환 버튼. SearchView 를 push 가 아닌 검색 탭으로 직접 이동.
+                    Button {
+                        state.selectedTab = 1   // 검색 탭
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -51,6 +53,7 @@ struct HomeView: View {
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 20)
 
                     // Spotlight section header
@@ -89,6 +92,7 @@ struct HomeView: View {
                         .padding(.bottom, 24)
                 }
             }
+            .scrollIndicators(.hidden)
             .background(Color(.systemGroupedBackground))
             .navigationBarHidden(true)
             .refreshable {
@@ -134,6 +138,7 @@ struct HomeView: View {
         } else {
             VStack(spacing: 0) {
                 ForEach(watchlist) { t in
+                    let risk = watchlistRisk[t.ticker]
                     NavigationLink {
                         VerdictView(ticker: t.ticker)
                     } label: {
@@ -142,10 +147,11 @@ struct HomeView: View {
                             nameKr: t.companyNameKr,
                             price: nil,
                             priceChangePct: nil,
-                            grade: nil,
-                            worstCasePct: nil
+                            grade: risk?.grade,
+                            worstCasePct: risk?.worstCasePct
                         )
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
@@ -156,7 +162,7 @@ struct HomeView: View {
                         }
                     }
                     if t.id != watchlist.last?.id {
-                        Divider().padding(.leading, 16)
+                        Divider().padding(.leading, 18)
                     }
                 }
             }
@@ -168,14 +174,43 @@ struct HomeView: View {
     private func loadWatchlist() async {
         guard state.isAuthenticated else {
             self.watchlist = []
+            self.watchlistRisk = [:]
             return
         }
         do {
             let data = try await WatchlistAPI.list()
             self.watchlist = data.items
+            await loadWatchlistRisk(tickers: data.items.map { $0.ticker })
         } catch {
             // 조용히 실패 — 헤더 카드 영향 X
             self.watchlist = []
+            self.watchlistRisk = [:]
+        }
+    }
+
+    // 워치리스트 각 티커의 risk 데이터를 병렬 fetch. 일부 실패해도 나머지는 표시.
+    private func loadWatchlistRisk(tickers: [String]) async {
+        guard !tickers.isEmpty else {
+            self.watchlistRisk = [:]
+            return
+        }
+        await withTaskGroup(of: (String, (grade: String, worstCasePct: Double)?).self) { group in
+            for t in tickers {
+                group.addTask {
+                    do {
+                        let v = try await RiskAPI.verdict(ticker: t)
+                        let pct = Double(v.grade.worstCasePct) ?? 0
+                        return (t, (grade: v.grade.value, worstCasePct: pct))
+                    } catch {
+                        return (t, nil)
+                    }
+                }
+            }
+            var result: [String: (grade: String, worstCasePct: Double)] = [:]
+            for await (ticker, pair) in group {
+                if let pair = pair { result[ticker] = pair }
+            }
+            self.watchlistRisk = result
         }
     }
 
@@ -199,7 +234,7 @@ struct HomeView: View {
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .frame(height: 220)
-                .background(Color.red.opacity(0.04))
+                .background(Color.red.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         } else if let s = spotlight {
             NavigationLink {
@@ -272,7 +307,7 @@ struct HomeView: View {
             }
         }
         .padding(18)
-        .background(Color.red.opacity(0.06))
+        .background(Color.red.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
@@ -284,6 +319,8 @@ struct HomeView: View {
         do {
             let data = try await RiskAPI.spotlight()
             self.spotlight = data.spotlight
+        } catch where error.isCancellation {
+            // view rebuild / 탭 전환 시 cancel → 정상
         } catch {
             self.errorMessage = error.localizedDescription
         }
@@ -298,7 +335,7 @@ private struct ProfileBubble: View {
         if let s = initial {
             // 인증 — 이니셜 원형
             Circle()
-                .fill(Color.gray.opacity(0.15))
+                .fill(Color(.tertiarySystemFill))
                 .frame(width: 36, height: 36)
                 .overlay(
                     Text(s).font(.caption.weight(.bold)).foregroundStyle(Color(.label))

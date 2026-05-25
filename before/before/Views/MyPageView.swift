@@ -12,7 +12,6 @@ struct MyPageView: View {
     @EnvironmentObject var state: AppState
     @State private var profile: UserPublic?
     @State private var stats: HistoryStatsData?
-    @State private var watchlistCount: Int?
 
     var body: some View {
         NavigationStack {
@@ -74,15 +73,14 @@ struct MyPageView: View {
 
                 // 설정
                 Section("설정") {
+                    // 관심 종목 관리는 탭으로 승격 — 여기선 제거, 대신 분석 기록 진입.
                     NavigationLink {
-                        WatchlistManageView()
+                        HistoryView()
                     } label: {
                         HStack {
-                            Label("관심 종목 관리", systemImage: "heart")
+                            Label("분석 기록", systemImage: "list.bullet.rectangle")
                             Spacer()
-                            if let n = watchlistCount {
-                                Text("\(n)개").font(.caption).foregroundStyle(.secondary)
-                            }
+                            Text("verdict 조회 이력").font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     NavigationLink {
@@ -132,6 +130,7 @@ struct MyPageView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollIndicators(.hidden)
             .navigationTitle("마이페이지")
             .navigationBarTitleDisplayMode(.large)
             .task(id: state.isAuthenticated) { await reload() }
@@ -146,7 +145,7 @@ struct MyPageView: View {
         let daysSince = daysSinceCreated(user.createdAt)
         return HStack(spacing: 12) {
             Circle()
-                .fill(Color.gray.opacity(0.15))
+                .fill(Color(.tertiarySystemFill))
                 .frame(width: 48, height: 48)
                 .overlay(Text(initial).font(.title3.weight(.bold)).foregroundStyle(Color(.label)))
             VStack(alignment: .leading, spacing: 2) {
@@ -165,7 +164,7 @@ struct MyPageView: View {
         } label: {
             HStack(spacing: 12) {
                 Circle()
-                    .fill(Color.gray.opacity(0.15))
+                    .fill(Color(.tertiarySystemFill))
                     .frame(width: 48, height: 48)
                     .overlay(Image(systemName: "person").foregroundStyle(.secondary))
                 VStack(alignment: .leading, spacing: 2) {
@@ -211,17 +210,14 @@ struct MyPageView: View {
         guard state.isAuthenticated else {
             self.profile = nil
             self.stats = nil
-            self.watchlistCount = nil
             return
         }
         async let p = try? MeAPI.profile()
         async let s = try? HistoryAPI.stats()
-        async let w = try? WatchlistAPI.list()
         let user = await p
         self.profile = user
         if let user = user { state.currentUser = user }   // 전역 동기화
         self.stats = await s
-        self.watchlistCount = (await w)?.count
     }
 
     private func daysSinceCreated(_ iso: String) -> Int? {

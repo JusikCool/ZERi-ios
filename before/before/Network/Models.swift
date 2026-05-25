@@ -189,6 +189,12 @@ struct RiskVerdictData: Decodable, Sendable {
     let prediction: RiskPredictionSection
     let xai: RiskXaiSection?
     let summaryNarrative: String?
+    /// Upstage Solar 가 정제한 풀어쓴 한 단락 설명. 매일 cron 갱신.
+    /// 미존재 시 nil — 화면은 summaryNarrative 로 폴백.
+    let detailedNarrative: String?
+    /// detailedNarrative 가 기반한 추론 기준일자 (ISO yyyy-MM-dd).
+    /// asOf 와 다르면 cron 실패로 며칠 묵은 상태.
+    let detailedNarrativeBaseDate: String?
     let analysisId: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -198,6 +204,8 @@ struct RiskVerdictData: Decodable, Sendable {
         case asOf = "as_of"
         case grade, prediction, xai
         case summaryNarrative = "summary_narrative"
+        case detailedNarrative = "detailed_narrative"
+        case detailedNarrativeBaseDate = "detailed_narrative_base_date"
         case analysisId = "analysis_id"
     }
 }

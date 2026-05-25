@@ -88,7 +88,7 @@ struct WorstCaseCard: View {
                 .frame(maxWidth: .infinity)
         }
         .padding(20)
-        .background(Color.red.opacity(0.06))
+        .background(Color.red.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
@@ -129,7 +129,7 @@ struct FanChartLite: View {
                     yStart: .value("Q15", q15[i]),
                     yEnd: .value("Zero", 0.0)
                 )
-                .foregroundStyle(Color.red.opacity(0.08))
+                .foregroundStyle(Color.red.opacity(0.12))
                 .interpolationMethod(.monotone)
             }
 
@@ -140,7 +140,7 @@ struct FanChartLite: View {
                     yStart: .value("Q05", q05[i]),
                     yEnd: .value("Q15", q15[i])
                 )
-                .foregroundStyle(Color.red.opacity(0.15))
+                .foregroundStyle(Color.red.opacity(0.22))
                 .interpolationMethod(.monotone)
             }
 
@@ -176,7 +176,7 @@ struct FanChartLite: View {
             // 선택된 날짜 강조
             if let day = selectedDay, day >= 1, day <= dayCount {
                 RuleMark(x: .value("Selected", day))
-                    .foregroundStyle(Color.gray.opacity(0.35))
+                    .foregroundStyle(Color(.separator))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
 
                 PointMark(

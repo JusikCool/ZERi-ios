@@ -63,7 +63,7 @@ struct RiskMainChart: View {
                     yStart: .value("Q15", p.value),
                     yEnd: .value("Zero", 0.0)
                 )
-                .foregroundStyle(Color.red.opacity(0.08))
+                .foregroundStyle(Color.red.opacity(0.12))
                 .interpolationMethod(.monotone)
             }
 
@@ -74,7 +74,7 @@ struct RiskMainChart: View {
                     yStart: .value("Q05", q05Pts[i].value),
                     yEnd: .value("Q15", q15Pts[i].value)
                 )
-                .foregroundStyle(Color.red.opacity(0.18))
+                .foregroundStyle(Color.red.opacity(0.25))
                 .interpolationMethod(.monotone)
             }
 
@@ -140,7 +140,7 @@ struct RiskMainChart: View {
             // ── 선택 마커 (탭 시)
             if let day = selectedDay {
                 RuleMark(x: .value("Selected", day))
-                    .foregroundStyle(Color.gray.opacity(0.35))
+                    .foregroundStyle(Color(.separator))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             }
         }
@@ -179,7 +179,17 @@ struct RiskMainChart: View {
 
     private func legendDot(color: Color, label: String, dashed: Bool) -> some View {
         HStack(spacing: 5) {
-            Rectangle().fill(color).frame(width: 14, height: 2)
+            // dashed 면 점선 stroke 로 그려서 차트 본체의 Q15 라인 스타일과 일치.
+            if dashed {
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: 1))
+                    path.addLine(to: CGPoint(x: 14, y: 1))
+                }
+                .stroke(color, style: StrokeStyle(lineWidth: 2, dash: [2.5, 2.5]))
+                .frame(width: 14, height: 2)
+            } else {
+                Rectangle().fill(color).frame(width: 14, height: 2)
+            }
             Text(label).font(.caption2).foregroundStyle(.secondary)
         }
     }

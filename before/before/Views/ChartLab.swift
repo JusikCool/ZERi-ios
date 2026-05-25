@@ -235,6 +235,7 @@ struct ChartLabAppleView: View {
             }
             .padding(16)
         }
+        .scrollIndicators(.hidden)
         .navigationTitle("\(ticker) · Apple Charts")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -312,7 +313,7 @@ struct ChartLabAppleView: View {
 
             if let day = selectedDay, day >= 1, day <= b.dayCount {
                 RuleMark(x: .value("Selected", day))
-                    .foregroundStyle(Color.gray.opacity(0.35))
+                    .foregroundStyle(Color(.separator))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
 
                 ForEach(sortedKeys, id: \.self) { key in
@@ -503,6 +504,7 @@ struct ChartLabCustomView: View {
             }
             .padding(16)
         }
+        .scrollIndicators(.hidden)
         .navigationTitle("\(ticker) · Canvas 차트")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -633,7 +635,7 @@ struct ChartLabCustomView: View {
                     var vline = Path()
                     vline.move(to: CGPoint(x: x, y: topPad))
                     vline.addLine(to: CGPoint(x: x, y: sz.height - bottomPad))
-                    ctx.stroke(vline, with: .color(Color.gray.opacity(0.45)),
+                    ctx.stroke(vline, with: .color(Color(.systemGray3)),
                                style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
 
                     for key in sortedKeys {

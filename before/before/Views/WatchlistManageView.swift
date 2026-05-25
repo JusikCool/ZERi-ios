@@ -49,6 +49,7 @@ struct WatchlistManageView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollIndicators(.hidden)
             }
         }
         .navigationTitle("관심 종목")
@@ -97,7 +98,7 @@ struct WatchlistManageView: View {
             Text(item.ticker)
                 .font(.caption2.weight(.bold))
                 .padding(.horizontal, 8).padding(.vertical, 5)
-                .background(Color.gray.opacity(0.15))
+                .background(Color(.tertiarySystemFill))
                 .foregroundStyle(Color(.label))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .frame(width: 60, alignment: .center)
@@ -127,10 +128,12 @@ struct WatchlistManageView: View {
             } label: {
                 Text("로그인 / 회원가입")
                     .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 24).padding(.vertical, 10)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 24).padding(.vertical, 12)
+                    .background(.white, in: Capsule())
+                    .overlay(Capsule().stroke(Color(.separator), lineWidth: 0.5))
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color(.label))
+            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 32)
@@ -174,6 +177,8 @@ struct WatchlistManageView: View {
         do {
             let data = try await WatchlistAPI.list()
             self.items = data.items
+        } catch where error.isCancellation {
+            // 취소 무시 — view rebuild / 탭 전환 시 정상 흐름
         } catch {
             self.errorMessage = error.localizedDescription
         }

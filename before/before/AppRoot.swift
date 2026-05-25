@@ -39,6 +39,10 @@ final class AppState: ObservableObject {
     @Published var route: Route
     @Published var currentUser: UserPublic?
 
+    /// 탭 선택 상태 — 다른 탭(예: 홈)에서 프로그래밍으로 검색 탭으로 전환할 때 사용.
+    /// 0: 홈, 1: 검색, 2: 관심, 3: 마이.
+    @Published var selectedTab: Int = 0
+
     /// 사용자 이름의 첫 글자 (프로필 버블용). 미로그인/이름 없을 시 "?".
     var userInitial: String {
         guard let name = currentUser?.name, let first = name.first else { return "?" }
