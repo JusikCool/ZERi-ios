@@ -58,6 +58,7 @@ struct TermsHistoryView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollIndicators(.hidden)
         .navigationTitle("약관 동의 이력")
         .navigationBarTitleDisplayMode(.large)
         .task { reload() }

@@ -95,6 +95,7 @@ struct NotificationSettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollIndicators(.hidden)
         .navigationTitle("알림 설정")
         .navigationBarTitleDisplayMode(.large)
     }

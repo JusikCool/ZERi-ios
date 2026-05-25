@@ -32,6 +32,7 @@ struct TermsGateView: View {
                 }
                 .padding(20)
             }
+            .scrollIndicators(.hidden)
             Divider()
             footer
         }
@@ -203,6 +204,7 @@ struct TermsDetailSheet: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollIndicators(.hidden)
             .navigationTitle(termsKey.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

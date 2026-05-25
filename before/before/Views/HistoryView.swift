@@ -59,10 +59,12 @@ struct HistoryView: View {
             } label: {
                 Text("로그인 / 회원가입")
                     .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 24).padding(.vertical, 10)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 24).padding(.vertical, 12)
+                    .background(.white, in: Capsule())
+                    .overlay(Capsule().stroke(Color(.separator), lineWidth: 0.5))
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color(.label))
+            .buttonStyle(.plain)
             .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -126,6 +128,7 @@ struct HistoryView: View {
             }
             .padding(.top, 12)
         }
+        .scrollIndicators(.hidden)
     }
 
     private var emptyBlock: some View {
@@ -220,6 +223,8 @@ struct HistoryView: View {
         do {
             let data = try await HistoryAPI.list(grade: filter)
             self.items = data.items
+        } catch where error.isCancellation {
+            // 탭 전환/필터 빠른 토글 시 cancel → 정상 흐름
         } catch {
             self.errorMessage = error.localizedDescription
         }
